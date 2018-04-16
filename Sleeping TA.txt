@@ -1,0 +1,111 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#define MAX_STUDENT 25
+
+void *student(void *num);
+void *teachinga(void *);
+
+void randwait(int secs);
+
+sem_t waitingRoom;   
+
+sem_t teachingaChair;
+
+sem_t teachingaPillow;
+
+sem_t seatBelt;
+
+int allDone = 0;
+
+int main(int argc, char *argv[]) {
+    pthread_t btid;
+    pthread_t tid[MAX_STUDENT];
+    long RandSeed;
+    int i, numStudent, numChairs;
+    int Number[MAX_STUDENT];
+
+    if (argc != 4)
+	 {
+    printf("Use: SleepTeachinga <Num Student> <Num Chairs> <rand seed>\n");
+    exit(-1);
+    }
+    numStudent = atoi(argv[1]);
+    numChairs = atoi(argv[2]);
+    RandSeed = atol(argv[3]);
+
+    
+    if (numStudent > MAX_STUDENT) {
+    printf("The maximum number of Student is %d.\n", MAX_STUDENT);
+    exit(-1);
+    }
+
+    printf("\nSleepTeachinga.c\n\n");
+    printf("A solution to the sleeping teaching assistant problem using semaphores.\n");
+
+    srand48(RandSeed);
+    for (i=0; i<MAX_STUDENT; i++) {
+    Number[i] = i;
+    }
+
+    sem_init(&waitingRoom, 0, numChairs);
+    sem_init(&teachingaChair, 0, 1);
+    sem_init(&teachingaPillow, 0, 0);
+    sem_init(&seatBelt, 0, 0);
+
+    pthread_create(&btid, NULL, teachinga , NULL);
+    for (i=0; i<numStudent; i++)
+	 {
+    pthread_create(&tid[i], NULL, student , (void *)&Number[i]);
+    }
+    for (i=0; i<numStudent; i++)
+	 {
+    pthread_join(tid[i],NULL);
+    }
+    allDone = 1;
+    sem_post(&teachingaPillow); 
+    pthread_join(btid,NULL);    
+}
+
+void *student(void *number) {
+    int num = *(int *)number;
+    printf("Student %d leaving for TA Room.\n", num);
+    randwait(5);
+    printf("Student %d arrived at TA Room.\n", num);
+    sem_wait(&waitingRoom);
+    printf("Student %d entering waiting room.\n", num);
+    sem_wait(&teachingaChair);
+    sem_post(&waitingRoom);
+    printf("Student %d waking the TA.\n", num);
+    sem_post(&teachingaPillow);
+    sem_wait(&seatBelt);
+    sem_post(&teachingaChair);
+    printf("Student %d leaving TA Room.\n", num);
+}
+
+void *teachinga(void *junk) {
+    while (!allDone) 
+	{
+    printf("The TA is sleeping\n");
+    sem_wait(&teachingaPillow);
+    if (!allDone) 
+	{
+
+        printf("The TA is Helping\n");
+        randwait(3);
+        printf("The TA has finished Helping.\n");
+        sem_post(&seatBelt);
+    }
+    else {
+        printf("The TA is going home for the day.\n");
+    	}
+    }
+}
+
+void randwait(int secs) {
+    int len;
+    len = (int) ((drand48() * secs) + 1);
+    sleep(len);
+}
